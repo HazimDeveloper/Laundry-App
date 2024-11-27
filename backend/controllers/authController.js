@@ -1,5 +1,7 @@
 const { User } = require('../models');
 const jwt = require('jsonwebtoken');
+const user = require('../models/user');
+const bcrypt = require('bcrypt');
 
 const authController = {
   register: async (req, res) => {
@@ -76,9 +78,9 @@ const authController = {
       // Regular user login
       const user = await User.findOne({ where: { email } });
 
-      // if (!user || !(await user.validPassword(password))) {
-      //   return res.status(401).json({ error: 'Invalid credentials' });
-      // }
+      if (user.passwordHash !== password) {
+        return res.status(401).json({ error: 'Invalid password' });
+      }
 
       const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
         expiresIn: '1d'
@@ -97,6 +99,36 @@ const authController = {
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ error: 'Login failed' });
+    }
+  },
+  getProfile: async (req, res) => {
+    try{
+      const token = req.header('Authorization')?.replace("Bearer ", "");
+      if(!token){
+        return res.status(401).json({ error: 'No token, authorization denied' });
+      } 
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userId = decoded.id;  
+      const user = await User.findByPk(userId,{
+        attributes: ['id','name','email','address','role']
+      });
+
+      if(!user){
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+
+      res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        address: user.address
+      });
+    }catch(error){
+      console.error('Error fetching profile:', error);
+      res.status(500).json({ error: 'Failed to load profile' });
     }
   }
 };

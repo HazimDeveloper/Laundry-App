@@ -1,4 +1,4 @@
-const { where } = require("sequelize");
+const { where, Op } = require("sequelize");
 const {
   Order,
   Customer,
@@ -12,121 +12,42 @@ const order = require("../models/order");
 const service = require("../models/service");
 
 const orderController = {
-  createOrder: async (req, res) => {
-    try {
-      const { customerId, serviceId, services, addressId } = req.body;
-
-      const customer = await Customer.findByPk({ where: { id: customerId } });
-
-      if (!customer) {
-        return res.status(404).json({ message: "Customer not found" });
-      }
-
-      const user = await User.findByPk(customer.userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      const address = await Address.findByOne({
-        where: { id: addressId, customerId: customerId },
-      });
-
-      if (!address) {
-        return res.status(404).json({ message: "Address not found" });
-      }
-
-      const order = await Order.create({
-        customerId: customerId,
-        userId: user.id,
-        status: "pending",
-      });
-
-      let total = 0;
-      //add all service price to total
-      for (let serviceItem of services) {
-        const service = await Service.findByPk(serviceItem.serviceId);
-        if (!service) {
-          return res.status(404).json({ message: "Service not found" });
-        }
-
-        await OrderItem.create({
-          orderId: order.id,
-          serviceId: serviceItem.serviceId,
-          quantity: serviceItem.quantity,
-          price: service.price,
-        });
-
-        total += service.price * serviceItem.quantity;
-      }
-
-      await order.update({ total: total });
-
-      //fetch complete order item
-
-      const completerOrder = await Order.findByPk(order.id, {
-        include: [
-          { model: Customer },
-          { model: Service, through: OrderItem },
-          { model: User },
-          { model: Address },
-        ],
-      });
-      res.status(200).json(completerOrder);
-    } catch (error) {
-      console.error("Error creating order:", error);
-      res.status(500).json({ error: "An error occurred while creating order" });
-    }
-  },
-
   getOrderHistory: async (req, res) => {
     try {
-      const { customerId } = req.params;
+      // Get user ID from auth middleware
+      const userId = req.user.id;
 
-      const customer = await Customer.findByPk({ where: { id: customerId } });
-      if (!customer) {
-        return res.status(404).json({ message: "Customer not found" });
-      }
-
-      const orderHistory = await Order.findAll({
-        where: { customerId: customerId },
+      const orders = await Order.findAll({
         include: [
-          //Service model
           {
             model: Service,
             through: {
-              model: OrderItem,
-              attributes: ["quantity", "price"],
-            },
+              attributes: ['quantity', 'price']
+            }
           },
-          //Address model
           {
-            model: Address,
-            attributes: ["street", "city", "state", "postal_code"],
-          },
-          //Payment model
-          {
-            model: Payment,
-            attributes: [
-              "amount",
-              "payment_method",
-              "transaction_id",
-              "status",
-              "timestamp",
-            ],
-          },
-          //User model
-          {
-            model: User,
-            attributes: ["name", "email"],
-          },
+            model: Customer,
+            attributes: ['name', 'phone']
+          }
         ],
-        order: [["createdAt", "DESC"]],
+        order: [['createdAt', 'DESC']]
       });
+
+      // Format the orders data
+      const formattedOrders = orders.map(order => ({
+        id: order.id,
+        service: order.Services.map(s => s.name).join(', '),
+        dateTime: order.createdAt.toISOString(),
+        status: order.status,
+        total: order.Services.reduce((sum, service) => 
+          sum + (service.OrderItem.quantity * service.OrderItem.price), 0
+        ).toFixed(2)
+      }));
+
+      res.json(formattedOrders);
     } catch (error) {
-      console.error("Error retrieving order history:", error);
-      res
-        .status(500)
-        .json({ error: "An error occurred while retrieving order history" });
+      console.error('Error fetching order history:', error);
+      res.status(500).json({ error: 'Failed to fetch order history' });
     }
   },
   updateOrderStatus: async (req, res) => {
@@ -201,61 +122,63 @@ const orderController = {
 
       const formattedOrders = Order.map((order) => ({
         id: order.id,
-        dateOrdered : order.createdAt,
+        dateOrdered: order.createdAt,
         services: order.Service.map((service) => ({
-            name: service.name,
-            price: service.price,
-            quantity: service.OrderItem.quantity
+          name: service.name,
+          price: service.price,
+          quantity: service.OrderItem.quantity,
         })),
         total: order.total,
         status: order.status,
         hoursToComplete: order.hoursToComplete,
         pickupDateTime: order.pickupDateTime,
-        customer: order.Customer ? {
-          name: order.Customer.name,
-          email: order.Customer.email
-        }: null,
+        customer: order.Customer
+          ? {
+              name: order.Customer.name,
+              email: order.Customer.email,
+            }
+          : null,
       }));
 
       res.json(formattedOrders);
     } catch (error) {
       console.error("Error getting detailed order:", error);
-      res.status(500).json({ error: "An error occurred while getting detailed order" });
+      res
+        .status(500)
+        .json({ error: "An error occurred while getting detailed order" });
     }
   },
 
   setPickupDateTime: async (req, res) => {
-    try{
+    try {
+      const { orderId } = req.params;
+      const { pickupDateTime } = req.body;
 
-        const { orderId }  =req.params;
-        const { pickupDateTime } = req.body;    
+      const order = await Order.findByPk(orderId);
 
-        const order = await Order.findByPk(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
 
-        if(!order){
-            return res.status(404).json({ message: "Order not found" });
-        }
+      await order.update({ pickupDateTime: new Date(pickupDateTime) });
 
-        await order.update({ pickupDateTime: new Date(pickupDateTime) });
-
-        res.json({ message: "Pickup date time set successfully" });
-
-    }catch(error){
+      res.json({ message: "Pickup date time set successfully" });
+    } catch (error) {
       console.error("Error setting pickup date time:", error);
-      res.status(500).json({ error: "An error occurred while setting pickup date time" });
+      res
+        .status(500)
+        .json({ error: "An error occurred while setting pickup date time" });
     }
-  
-    
   },
-  getOrderDetailsAfterPayment : async (req, res) => {
-    try{
+  getOrderDetailsAfterPayment: async (req, res) => {
+    try {
       const { orderId } = req.params;
       const order = await Order.findByPk(orderId, {
         where: {
-          id: orderId
+          id: orderId,
         },
         include: [
-          { model: User,attributes: ["name"] },
+          { model: User, attributes: ["name"] },
           { model: Service, through: { attributes: ["quantity"] } },
           {
             model: Customer,
@@ -263,7 +186,7 @@ const orderController = {
           },
           {
             model: Address,
-            attributes: ['street', 'city', 'state', 'postalCode']
+            attributes: ["street", "city", "state", "postalCode"],
           },
           {
             model: Service,
@@ -271,19 +194,19 @@ const orderController = {
           },
           {
             model: Payment,
-            attributes: ['amount', 'paymentMethod', 'status'],
-            order: [['createdAt', 'DESC']],
-            limit: 1
-          }
-        ]
+            attributes: ["amount", "paymentMethod", "status"],
+            order: [["createdAt", "DESC"]],
+            limit: 1,
+          },
+        ],
       });
 
-      if(!order){
+      if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
 
       const latestPayment = order.Payment[0];
-      if(!latestPayment || latestPayment.status !== "complete"){
+      if (!latestPayment || latestPayment.status !== "complete") {
         return res.status(404).json({ message: "Payment not found" });
       }
 
@@ -292,29 +215,290 @@ const orderController = {
         phoneNumber: order.Customer.phone,
         service: order.Service.map((service) => ({
           name: service.name,
-          quantity: service.OrderItem.quantity
+          quantity: service.OrderItem.quantity,
         })),
         orderDate: order.createdAt,
-        address: order.Address ? `${order.Address.street}, ${order.Address.city}, ${order.Address.state} ${order.Address.postalCode}` : 'No address provided',
+        address: order.Address
+          ? `${order.Address.street}, ${order.Address.city}, ${order.Address.state} ${order.Address.postalCode}`
+          : "No address provided",
         urgencyType: order.urgencyType,
         total: order.total,
         paymentMethod: latestPayment.paymentMethod,
         status: latestPayment.status,
         hoursToComplete: order.hoursToComplete,
         pickupDateTime: order.pickupDateTime,
-        assignedTo: Order.user ? order.user.name : 'Not assigned'
-
-
+        assignedTo: Order.user ? order.user.name : "Not assigned",
       };
       res.json(orderDetails);
-    }catch(error){
+    } catch (error) {
       console.error("Error setting pickup date time:", error);
-      res.status(500).json({ error: "An error occurred while setting pickup date time" });
+      res
+        .status(500)
+        .json({ error: "An error occurred while setting pickup date time" });
+    }
+  },
+
+  getOnGoingOrders: async (req, res) => {
+    try {
+      const orders = await Order.findAll({
+        where: {
+          status: ["in process", "in process"],
+        },
+        include: [
+          {
+            model: Service,
+            through: {
+              attributes: ["quantity", "price"],
+            },
+          },
+          {
+            model: Customer,
+            attributes: ["name", "phone"],
+          },
+        ],
+        order: [["createdAt", "DESC"]],
+      });
+
+      const formattedOrders = orders.map((order) => ({
+        id: order.id,
+        serviceName: order.Service.map((service) => service.name).join(", "),
+        duration: _calculateDuration,
+        status: order.status,
+        customerName: order.Customer.name,
+        total: order.total,
+      }));
+      res.json(formattedOrders);
+    } catch (error) {
+      console.error("Error getting on going orders:", error);
+      res
+        .status(500)
+        .json({ error: "An error occurred while getting on going orders" });
+    }
+  },
+  getOrderDetails: async (req, res) => {
+    try {
+      const { orderId } = req.params;
+
+      const order = await Order.findByPk(orderId, {
+        include: [
+          {
+            model: Service,
+            through: {
+              attributes: ['quantity', 'price']
+            }
+          },
+          {
+            model: Customer,
+            attributes: ['name', 'phone', 'email', 'deliveryType', 'latitude', 'longitude']
+          },
+          {
+            model: Address,
+            attributes: ['street', 'city', 'state', 'postal_code']
+          }
+        ]
+      });
+
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+
+      const orderDetails = {
+        id: order.id,
+        service: order.Services.map(s => s.name).join(', '),
+        date: order.createdAt,
+        price: order.Services.reduce((sum, service) => 
+          sum + (service.OrderItem.quantity * service.OrderItem.price), 0
+        ),
+        pickupDateTime: order.pickupDateTime,
+        isDelivery: order.Customer?.deliveryType === 'Express',
+        status: order.status,
+        customer: {
+          name: order.Customer?.name,
+          phone: order.Customer?.phone,
+          email: order.Customer?.email,
+          deliveryType: order.Customer?.deliveryType,
+          location: order.Customer?.latitude && order.Customer?.longitude ? {
+            latitude: order.Customer.latitude,
+            longitude: order.Customer.longitude
+          } : null
+        },
+        address: order.Address ? {
+          street: order.Address.street,
+          city: order.Address.city,
+          state: order.Address.state,
+          postalCode: order.Address.postal_code
+        } : null,
+        services: order.Services.map(service => ({
+          name: service.name,
+          quantity: service.OrderItem.quantity,
+          price: service.OrderItem.price,
+          subtotal: service.OrderItem.quantity * service.OrderItem.price
+        }))
+      };
+
+      res.json(orderDetails);
+    } catch (error) {
+      console.error('Error fetching order details:', error);
+      res.status(500).json({ error: 'Failed to fetch order details' });
+    }
+  },
+
+  searchOrder: async (req, res) => {
+    try{
+      const { query } = req.query;
+      const userId = req.user.id;
+
+      const orders = await Order.findAll({
+        where: {
+          [Op.or]: [
+            { UserId: userId }, 
+            { "$Customer.UserId$": userId }],
+            [Op.or] : [
+              { 
+                status: 
+                { [Op.iLike]: `%${query}%` } 
+              },
+              {
+                '$Services.name$': {[Op.iLike]: `%${query}%` },
+              }
+            ]
+        },
+        include: [
+          {
+            model: Service,
+            through: {
+              attributes: ["quantity", "price"],
+            },
+        } ,
+        {
+          model: Customer,
+          attributes: ["name", "phone"],
+        }
+        ],
+        order: [["createdAt", "DESC"]],
+      });
+
+      const formattedOrders = orders.map((order) => ({
+        id: order.id,
+        service: order.Service.map((service) => service.name).join(", "),
+        dateTime: order.createdAt.toISOString(),
+        status: order.status,
+        total: order.Service.reduce((sum, service) => {
+          return sum + (service.price * service.OrderItem.quantity);
+        },0),
+        customerName: order.Customer.name,
+        customerPhone: order.Customer.phone,
+        pickupDateTime: order.pickupDateTime,
+      }));
+      res.json(formattedOrders);
+
+    }catch(error){
+      console.error("Error searching order:", error);
+      res
+        .status(500)
+        .json({ error: "An error occurred while searching order" });
+    }
+  },
+  getActiveOrders: async (req, res) => {
+    try {
+      const userId = req.user.id;
+
+      const orders = await Order.findAll({
+        where: {
+          status: ['pending', 'in process']
+        },
+        include: [
+          {
+            model: Service,
+            through: {
+              attributes: ['quantity', 'price']
+            }
+          },
+          {
+            model: Customer,
+            attributes: ['name', 'phone', 'email', 'deliveryType']
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      const formattedOrders = orders.map(order => ({
+        id: order.id,
+        service: order.Services.map(s => s.name).join(', '),
+        date: order.createdAt,
+        price: order.Services.reduce((sum, service) => 
+          sum + (service.OrderItem.quantity * service.OrderItem.price), 0
+        ),
+        pickupDateTime: order.pickupDateTime || new Date(order.createdAt.getTime() + (24 * 60 * 60 * 1000)),
+        isDelivery: order.Customer?.deliveryType === 'Express',
+        status: order.status,
+        customer: {
+          name: order.Customer?.name || 'Unknown',
+          phone: order.Customer?.phone || 'N/A',
+          email: order.Customer?.email || 'N/A',
+          deliveryType: order.Customer?.deliveryType || 'Standard'
+        }
+      }));
+
+      res.json(formattedOrders);
+    } catch (error) {
+      console.error('Error fetching active orders:', error);
+      res.status(500).json({ error: 'Failed to fetch active orders' });
+    }
+  },
+
+  createOrder: async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { services, pickupDateTime } = req.body;
+  
+      const order = await Order.create({
+        UserId: userId,
+        pickupDateTime: new Date(pickupDateTime),
+        status: 'pending'
+      });
+  
+      // Create order items for each service
+      for (const serviceName of services) {
+        const service = await Service.findOne({ where: { name: serviceName } });
+        if (service) {
+          await OrderItem.create({
+            OrderId: order.id,
+            ServiceId: service.id,
+            quantity: 1, // Default quantity
+            price: service.price
+          });
+        }
+      }
+  
+      // Calculate total
+      const total = await OrderItem.sum('price', { where: { OrderId: order.id } });
+      await order.update({ total });
+  
+      const completeOrder = await Order.findOne({
+        where: { id: order.id },
+        include: [
+          {
+            model: Service,
+            through: { attributes: ['quantity', 'price'] }
+          }
+        ]
+      });
+  
+      res.status(201).json(completeOrder);
+    } catch (error) {
+      console.error('Error creating order:', error);
+      res.status(500).json({ error: 'Failed to create order' });
     }
   }
-
-    
-  
 };
+
+function _calculateDuration(startDate, toHoursToComplete) {
+  const endDate = new Date(startDate.getTime() + toHoursToComplete);
+  const now = new Date();
+  const hoursLeft = Math.ceil((endDate - now) / (1000 * 60 * 60));
+
+  return hoursLeft > 0 ? `${hoursLeft} hours left` : "Overdue";
+}
 
 module.exports = orderController;

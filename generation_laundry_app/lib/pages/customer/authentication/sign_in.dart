@@ -29,9 +29,7 @@ class _SignInState extends State<SignIn> {
       child: BlocConsumer<LoginBloc, LoginState>(
         listener: (context, state) {
           if (state is LoginSuccess) {
-            // Check user role and navigate accordingly
-              final userData = state.userData['user'];
-
+            final userData = state.userData['user'];
             if (userData['role'] == 'admin') {
               BlocProvider.of<NavigationBloc>(context)
                   .add(NavigationEvent.goToAdminDashboard);
@@ -50,6 +48,7 @@ class _SignInState extends State<SignIn> {
         },
         builder: (context, state) {
           return Scaffold(
+            resizeToAvoidBottomInset: false,  // Add this line
             body: Stack(
               children: [
                 // Background image
@@ -62,140 +61,140 @@ class _SignInState extends State<SignIn> {
                   ),
                 ),
                 SafeArea(
-                  child: SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: MediaQuery.of(context).size.height -
-                            MediaQuery.of(context).padding.top -
-                            MediaQuery.of(context).padding.bottom,
-                      ),
-                      child: IntrinsicHeight(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                          child: Column(
-                            children: [
-                              Expanded(
-                                child: Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(24.0),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Text(
-                                              'Sign in',
-                                              style: TextStyle(
-                                                fontSize: 24,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 16),
-                                            TextFormField(
-                                              controller: _emailController,
-                                              decoration: InputDecoration(
-                                                hintText: 'Email',
-                                                filled: true,
-                                                fillColor: Colors.white,
-                                                border: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  borderSide: BorderSide.none,
-                                                ),
-                                              ),
-                                              keyboardType: TextInputType.emailAddress,
-                                            ),
-                                            const SizedBox(height: 16),
-                                            TextFormField(
-                                              controller: _passwordController,
-                                              decoration: InputDecoration(
-                                                hintText: 'Password',
-                                                filled: true,
-                                                fillColor: Colors.white,
-                                                border: OutlineInputBorder(
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  borderSide: BorderSide.none,
-                                                ),
-                                              ),
-                                              obscureText: true,
-                                            ),
-                                            const SizedBox(height: 24),
-                                            ElevatedButton(
-                                              onPressed: state is LoginLoading
-                                                ? null
-                                                : () {
-                                                    if (_emailController.text.isNotEmpty &&
-                                                        _passwordController.text.isNotEmpty) {
-                                                      context.read<LoginBloc>().add(
-                                                        LoginSubmitted(
-                                                          email: _emailController.text,
-                                                          password: _passwordController.text,
-                                                        ),
-                                                      );
-                                                    } else {
-                                                      ScaffoldMessenger.of(context).showSnackBar(
-                                                        SnackBar(
-                                                          content: Text('Please enter both email and password'),
-                                                          backgroundColor: Colors.red,
-                                                        ),
-                                                      );
-                                                    }
-                                                  },
-                                              child: state is LoginLoading
-                                                ? CircularProgressIndicator(color: Colors.white)
-                                                : const Text(
-                                                    'Sign In',
-                                                    style: TextStyle(color: Colors.white),
-                                                  ),
-                                              style: ElevatedButton.styleFrom(
-                                                minimumSize: const Size(double.infinity, 50),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                                backgroundColor: Color(0xFF5c4095),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              // Sign up button at the bottom
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 20.0),
-                                child: TextButton(
-                                  onPressed: () {
-                                    BlocProvider.of<NavigationBloc>(context)
-                                        .add(NavigationEvent.goToRegistration);
-                                  },
-                                  child: RichText(
-                                    text: TextSpan(
-                                      style: TextStyle(fontSize: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Center(
+                            child: SingleChildScrollView(  // Wrap the form in SingleChildScrollView
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(24.0),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        TextSpan(
-                                          text: 'Don\'t have an account? ',
-                                          style: TextStyle(color: Colors.black.withOpacity(1)),
+                                        const Text(
+                                          'Sign in',
+                                          style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
                                         ),
-                                        TextSpan(
-                                          text: 'Sign up',
-                                          style: TextStyle(color: Color(0xFFf162ba)),
+                                        const SizedBox(height: 16),
+                                        TextFormField(
+                                          controller: _emailController,
+                                          decoration: InputDecoration(
+                                            hintText: 'Email',
+                                            filled: true,
+                                            fillColor: Colors.white,
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                          ),
+                                          keyboardType: TextInputType.emailAddress,
+                                        ),
+                                        const SizedBox(height: 16),
+                                        TextFormField(
+                                          controller: _passwordController,
+                                          decoration: InputDecoration(
+                                            hintText: 'Password',
+                                            filled: true,
+                                            fillColor: Colors.white,
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                          ),
+                                          obscureText: true,
+                                        ),
+                                        const SizedBox(height: 24),
+                                        ElevatedButton(
+                                          onPressed: state is LoginLoading
+                                            ? null
+                                            : () {
+                                                if (_emailController.text.isNotEmpty &&
+                                                    _passwordController.text.isNotEmpty) {
+                                                  context.read<LoginBloc>().add(
+                                                    LoginSubmitted(
+                                                      email: _emailController.text,
+                                                      password: _passwordController.text,
+                                                    ),
+                                                  );
+                                                } else {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text('Please enter both email and password'),
+                                                      backgroundColor: Colors.red,
+                                                    ),
+                                                  );
+                                                }
+                                              },
+                                          child: state is LoginLoading
+                                            ? SizedBox(
+                                                height: 20,
+                                                width: 20,
+                                                child: CircularProgressIndicator(
+                                                  color: Colors.white,
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                            : const Text(
+                                                'Sign In',
+                                                style: TextStyle(color: Colors.white),
+                                              ),
+                                          style: ElevatedButton.styleFrom(
+                                            minimumSize: const Size(double.infinity, 50),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            backgroundColor: Color(0xFF5c4095),
+                                          ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
+                        // Sign up button at the bottom
+                        SafeArea(  // Wrap bottom button in SafeArea
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20.0),
+                            child: TextButton(
+                              onPressed: () {
+                                BlocProvider.of<NavigationBloc>(context)
+                                    .add(NavigationEvent.goToSignUp);
+                              },
+                              child: RichText(
+                                text: TextSpan(
+                                  style: TextStyle(fontSize: 16),
+                                  children: [
+                                    TextSpan(
+                                      text: 'Don\'t have an account? ',
+                                      style: TextStyle(color: Colors.black.withOpacity(1)),
+                                    ),
+                                    TextSpan(
+                                      text: 'Sign up',
+                                      style: TextStyle(color: Color(0xFFf162ba)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

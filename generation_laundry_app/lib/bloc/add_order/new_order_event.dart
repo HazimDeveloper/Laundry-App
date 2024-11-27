@@ -1,4 +1,3 @@
-// new_order_event.dart
 import 'package:equatable/equatable.dart';
 
 abstract class NewOrderEvent extends Equatable {
@@ -24,4 +23,19 @@ class SelectDate extends NewOrderEvent {
 
   @override
   List<Object?> get props => [date];
+}
+
+class LoadServices extends NewOrderEvent {}
+
+class SubmitOrder extends NewOrderEvent {
+  final List<String> services;
+  final DateTime date;
+
+  const SubmitOrder({
+    required this.services,
+    required this.date,
+  });
+
+  @override
+  List<Object?> get props => [services, date];
 }

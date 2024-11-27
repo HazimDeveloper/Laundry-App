@@ -66,8 +66,8 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
     emit(DashboardLoading());
     try {
       final userData = await apiService.getUserProfile();
-      final ongoingOrders = await apiService.getOngoingOrders();
-      final services = await apiService.getServices();
+      final ongoingOrders = await apiService.getOngoingOrders() ;
+      final services = await apiService.getServices() ;
 
       emit(DashboardLoaded(
         userName: userData['name'],

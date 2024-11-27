@@ -1,40 +1,103 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:generation_laundry_app/bloc/order_history/order_history_bloc.dart';
+import 'package:generation_laundry_app/network/api_service.dart';
 import 'package:generation_laundry_app/widget/custom_bar_navigation.dart';
 
-class OrderHistoryScreen extends StatelessWidget {
+class OrderHistoryScreen extends StatefulWidget {
+  @override
+  _OrderHistoryScreenState createState() => _OrderHistoryScreenState();
+}
+
+class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Order History'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+    return BlocProvider(
+      create: (context) => OrderHistoryBloc(context.read<ApiService>())..add(LoadOrderHistory()),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Order History'),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 0,
+        ),
+        body: BlocBuilder<OrderHistoryBloc, OrderHistoryState>(
+          builder: (context, state) {
+            if (state is OrderHistoryLoading) {
+              return Center(child: CircularProgressIndicator());
+            }
+            
+            if (state is OrderHistoryError) {
+              return Center(child: Text(state.message));
+            }
+            
+            if (state is OrderHistoryLoaded) {
+              return Column(
+                children: [
+                  _buildSearchBar(context),
+                  if (state.filteredOrders.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.history, size: 64, color: Colors.grey),
+                            SizedBox(height: 16),
+                            Text(
+                              'No Orders Found',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: state.groupedOrders.length,
+                        itemBuilder: (context, index) {
+                          final date = state.groupedOrders.keys.elementAt(index);
+                          final orders = state.groupedOrders[date]!;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildDateSection(date),
+                              ...orders.map((order) => _buildOrderItem(
+                                order['service'],
+                                order['dateTime'],
+                                order['status'],
+                                'RM ${order['total'].toString()}',
+                              )),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              );
+            }
+            
+            return Container();
+          },
+        ),
+        bottomNavigationBar: CustomBottomNavigationBar(),
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _buildDateSection('Today'),
-                _buildOrderItem('Dry', '02 Feb 2024, 6:56 PM', 'Completed', 'RM 30'),
-                _buildOrderItem('Wash', '02 Feb 2024, 5:48 PM', 'Completed', 'RM 20'),
-                _buildDateSection('01 Feb 2024'),
-                _buildOrderItem('Wash', '01 Feb 2024, 6:48 PM', 'Completed', 'RM 30'),
-                _buildOrderItem('Iron', '08 Oct 2023, 6:48 PM', 'Completed', 'RM 35'),
-              ],
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: CustomBottomNavigationBar(),
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar(BuildContext context) {
     return Container(
       margin: EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -42,6 +105,10 @@ class OrderHistoryScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(30),
       ),
       child: TextField(
+        controller: _searchController,
+        onChanged: (query) {
+          context.read<OrderHistoryBloc>().add(SearchOrder(query));
+        },
         decoration: InputDecoration(
           hintText: 'Search Orders...',
           prefixIcon: Icon(Icons.search, color: Colors.pink),

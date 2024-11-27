@@ -6,11 +6,11 @@ class ApiService {
   // Get the appropriate base URL based on platform
   String get baseUrl {
     if (Platform.isAndroid) {
-      return 'http://10.62.57.101:3000';
+      return 'http://192.168.0.169:3000';
     } else if (Platform.isIOS) {
-      return 'http://10.62.57.101:3000';
+      return 'http://192.168.0.169:3000';
     }
-    return 'http://10.62.57.101:3000';
+    return 'http://192.168.0.169:3000';
   }
 
   Future<bool> checkConnection() async {
@@ -176,27 +176,11 @@ class ApiService {
       throw Exception('Error during sign in: $error');
     }
   }
-  Future<Map<String, dynamic>> getUserProfile() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/user/profile'),
-        headers: await _getAuthHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Failed to load profile');
-      }
-    } catch (e) {
-      throw Exception('Error loading profile: $e');
-    }
-  }
 
   Future<List<Map<String, dynamic>>> getOngoingOrders() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/orders/ongoing'),
+        Uri.parse('$baseUrl/api/order/ongoing'),
         headers: await _getAuthHeaders(),
       );
 
@@ -236,5 +220,131 @@ class ApiService {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
     };
+  }
+
+  Future<Map<String,dynamic>> getUserProfile() async {
+    try{
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      if(token == null){
+        throw Exception('Token not found');
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/auth/profile'),
+        headers: {
+          'Contenmt-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        }
+      );
+
+      print('Profile Response: ${response.body}'); 
+
+      if(response.statusCode == 200){
+        final data =  json.decode(response.body);
+        return data;
+      } else if(response.statusCode == 401){
+        throw Exception('Invalid Credentials');
+      }else{
+        throw Exception('Failed To login: ${response.body}');
+      }
+    }catch(e){
+      print('Error loading profile: $e');
+      throw Exception('Error loading profile: $e');  
+    }
+  }
+
+ Future<List<Map<String, dynamic>>> getOrderHistory() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    
+    if (token == null) {
+      throw Exception('No token found');
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/order/history'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    print('Order history response: ${response.body}');
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      return List<Map<String, dynamic>>.from(data);
+    } else {
+      throw Exception('Failed to load order history: ${response.body}');
+    }
+  } catch (e) {
+    print('Error loading order history: $e');
+    throw Exception('Error loading order history: $e');
+  }
+}
+
+// Add this method to your existing ApiService class
+Future<List<Map<String, dynamic>>> getActiveOrders() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    
+    if (token == null) {
+      throw Exception('No token found');
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/order/active'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      return List<Map<String, dynamic>>.from(data);
+    } else {
+      throw Exception('Failed to load active orders: ${response.body}');
+    }
+  } catch (e) {
+    print('Error loading active orders: $e');
+    throw Exception('Error loading active orders: $e');
+  }
+}
+
+Future<void> createOrder({
+    required List<String> services,
+    required DateTime date,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      
+      if (token == null) {
+        throw Exception('No token found');
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/order'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'services': services,
+          'pickupDateTime': date.toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode != 201) {
+        throw Exception('Failed to create order: ${response.body}');
+      }
+    } catch (e) {
+      print('Error creating order: $e');
+      throw Exception('Error creating order: $e');
+    }
   }
 }

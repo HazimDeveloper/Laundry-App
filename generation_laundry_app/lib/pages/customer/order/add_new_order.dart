@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:generation_laundry_app/bloc/add_order/new_order_bloc.dart';
 import 'package:generation_laundry_app/bloc/add_order/new_order_event.dart';
 import 'package:generation_laundry_app/bloc/add_order/new_order_state.dart';
+import 'package:generation_laundry_app/network/api_service.dart';
 import 'package:generation_laundry_app/routes/navigation_bloc.dart';
 import 'package:generation_laundry_app/widget/custom_bar_navigation.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -11,8 +12,19 @@ class AddNewOrder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => NewOrderBloc(),
-      child: AddNewOrderContent(),
+      create: (context) => NewOrderBloc(
+        apiService: context.read<ApiService>(),
+      )..add(LoadServices()),
+      child: BlocListener<NewOrderBloc, NewOrderState>(
+        listener: (context, state) {
+          if (state.error != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.error!)),
+            );
+          }
+        },
+        child: AddNewOrderContent(),
+      ),
     );
   }
 }

@@ -7,6 +7,7 @@ const authRoutes = require("./routes/authRoutes");
 const protectedRoutes = require("./routes/protectedRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const otpRoutes = require("./routes/otpRoutes");
+const serviceRoutes = require('./routes/serviceRoutes');
 require("dotenv").config();
 
 const app = express();
@@ -33,7 +34,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/", protectedRoutes);
 app.use("/api/order", orderRoutes);  // Fixed: added missing forward slash
 app.use("/api/otp", otpRoutes);
-
+app.use('/api/services',serviceRoutes)
 // Database connection and sync
 async function initializeDatabase() {
   try {
